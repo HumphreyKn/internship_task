@@ -1,0 +1,77 @@
+---
+title: "CEMA Internship Task"
+author: "Humphrey Kinoti"
+date: "`r Sys.Date()`"
+output: pdf_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+```
+
+***A copy of this project is in:*** [link to my github
+repo](https://github.com/HumphreyKn/internship_task)
+
+## Instructions
+
+You have been provided with a dataset which contains monthly data for
+children \<5 years, disaggregated at a county level for the period
+January 2021 to June 2023.
+
+### Dataset description
+
+The dataset contains the following variables:
+
+-   `period`: months from January 2021 to June 2023
+
+-   `county`: the 47 counties in Kenya
+
+-   `Total Dewormed`: Total number of children dewormed
+
+-   `Acute Malnutrition`: Number of children \<5 years with acute
+    malnutrition
+
+-   `stunted 0-6 months`, `stunted 6-23 months`, `stunted 24-59 months`:
+    Number of children stunted
+
+-   `diarrhea cases`: Number of children \<5 years with diarrhea
+
+-   `underweight 0-6 months`, `underweight 6-23 months`,
+    `underweight 24-59 months`: Number of children who are underweight
+
+### Objectives
+
+Your task is to: -
+
+-   Conduct exploratory data analysis
+
+-   State an appropriate research question you would want to answer from
+    the data
+
+-   Carry out appropriate data analysis to address the question you have
+    stated above
+
+## Explanatory Data Analysis
+
+### Import Data
+As the data is in CSV format, we will import data using `read_csv()` function in the `readr` package.
+
+```{r}
+library(tidyverse)
+cema_data <- read_csv("data/cema_internship_task_2023.csv")
+```
+
+After the importation, Let's have a look of how the data is structured to have a better understanding of the data. In this case, I will use the `skim` function from `skimr` package.
+
+```{r}
+library(skimr)
+skim(cema_data) %>% 
+  dplyr::select(skim_type, skim_variable, n_missing, 
+                character.min, character.max, character.empty,
+                character.n_unique,
+                numeric.mean, numeric.sd, numeric.p0, numeric.p25, numeric.p50, numeric.p75, numeric.p100)
+```
+
