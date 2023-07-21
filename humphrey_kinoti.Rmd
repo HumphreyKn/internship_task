@@ -74,4 +74,186 @@ skim(cema_data) %>%
                 character.n_unique,
                 numeric.mean, numeric.sd, numeric.p0, numeric.p25, numeric.p50, numeric.p75, numeric.p100)
 ```
+The above tables have some summary statistics of all the columns in the dataset and the nature missing values. However, the column names have some white spaces which will cause some tedious work during analysis. Lets replace the white spaces with an underscore(`_`). We will not remove the missing variables since we will lose some important data for other columns that are not missing.
 
+Moreover, the `period` column has dates data but it is of character datatype. We need to convert this column to date format, so that we can use it in creating time series plots to visualize the trends and patterns over time.
+
+### Data Cleaning
+Lets rename the column names
+
+```{r}
+new_colnames <- c("period","county","total_dewormed","acute_malnutrition", 
+                  "stunted_6-23_months", "stunted_0-<6_months", "stunted_24-59_months",
+                  "diarrhoea_cases", "underweight_0-<6_months", "underweight_6-23_months",
+                  "underweight_24-59_months")
+#create a copy of cema_data
+child_data <- cema_data
+names(child_data) <- new_colnames
+#check if the colnames were updated
+#colnames(child_data)
+#Adding a date column
+child_data$date <- my(child_data$period)
+summary(child_data$date)
+```
+
+### Data visualization
+
+Since all the continuous variables are discrete, line plot is the best. Since we have the date column, we can use it in creating time series plots to visualize the trends and patterns over time. There are different trends that we can check:
+a.    The trend of each variable over time.
+In this case, we 
+To do this, I will aggregate the dataset, grouping with time.
+```{r}
+#summing all colums by period
+time_agg <- as.data.frame(child_data) %>% 
+  dplyr::select(-c(county,date)) %>% 
+  group_by(period) %>% 
+  summarise(across(.cols = is.numeric, .fns = sum, na.rm = TRUE))
+#Adding the date column
+time_agg$date <- my(time_agg$period)
+#sorting by date column
+time_agg <- time_agg %>% 
+  arrange(date)
+
+deworm_data= time_agg %>% 
+  dplyr::select(period,date ,total_dewormed)
+
+#visualize using a line plot
+deworm_data %>% 
+  ggplot(aes(x= date, y= total_dewormed))+
+  ggtitle("Total number of children dewormed over time")+
+  xlab("date")+
+  ylab("Total number of children dewormed")+
+  geom_line()+
+  theme_classic()
+
+```
+
+From the above plot, we can answer the following research question: 
+-   How has the deworming program's effectiveness evolved over time from January 2021 to June 2023? 
+-   Are there any notable trends or patterns in the total number of children dewormed over the months?
+```{r}
+diarr_data= time_agg %>% 
+  dplyr::select(period,date ,diarrhoea_cases)
+
+#visualize using a line plot
+diarr_data %>% 
+  ggplot(aes(x= date, y= diarrhoea_cases))+
+  ggtitle("Number of children with diarrhea over time")+
+  xlab("date")+
+  ylab("Number of children with diarrhea")+
+  geom_line()+
+  theme_classic()
+```
+This plot can help us answer the following research question:
+-   Has there been a seasonal pattern in the prevalence of diarrhea cases over the study period?
+
+
+```{r}
+all_other <- time_agg %>% 
+  dplyr::select(-c(total_dewormed, diarrhoea_cases,`underweight_6-23_months`))
+library(reshape2)
+time_agg_long <- melt(all_other, id=c("period","date"))
+
+time_agg_long %>% 
+  ggplot(aes(x= date, y= value, color= variable))+
+  geom_line()+
+  theme(legend.position = "bottom")
+```
+This plot can help us answer the following research question:
+-   Has there been a seasonal pattern in the prevalence of acute malnutrition cases over the study period?
+
+b.    The trend of each variable over time in each county. For example, we can check the trend of number of children with diarrhea over time in Meru county
+
+```{r}
+meru_diarr <- as.data.frame(child_data) %>% 
+  dplyr::select(period,county ,diarrhoea_cases) %>% 
+  dplyr::filter(county == "Meru County")
+#Add time variable
+meru_diarr$date <- my(meru_diarr$period)
+#sort by date
+meru_diarr <- meru_diarr %>% arrange(date)
+
+#line plot
+meru_diarr %>% 
+  ggplot(aes(x= date, y= diarrhoea_cases))+
+  ggtitle("Number of children with diarrhea in Meru county over time")+
+  xlab("date")+
+  ylab("Number of children with diarrhea in Meru")+
+  geom_line()+
+  theme_minimal()
+```
+
+#### Geospatial Analysis
+First, we can have a simple bar plot to see the total distribution of all variables per county. For example in Meru county
+```{r}
+county_agg <- as.data.frame(child_data) %>% 
+  dplyr::select(-c(date, period)) %>% 
+  group_by(county) %>% 
+  summarise(across(.cols = is.numeric, .fns = sum, na.rm = TRUE))
+
+county_long = melt(county_agg, id = "county")
+result <- county_long %>% 
+    filter(county == "Meru County") %>% 
+    group_by(variable) %>% 
+    summarise(totals= sum(value)) %>% 
+  filter(variable != c("total_dewormed","diarrhoea_cases"))
+
+ggplot(result, aes(x = variable, y = totals)) + 
+  geom_bar(stat = "identity")+
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  NULL
+```
+
+Importing the shapefiles
+```{r}
+library(sf)
+sf_data <- read_sf("shapefiles/County.shp")
+head(sf_data)
+```
+Make a simple plot
+```{r}
+sf_data %>% 
+    ggplot() +
+  geom_sf(aes(fill = Name),show.legend = F)+
+   theme(legend.text.align = 1,
+        legend.title.align = 0.5,
+        plot.title = element_text(hjust = .1,vjust=0.2,size=18,family="Times"),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())+
+  geom_sf_text(aes(label= Code), size= 1.5)
+```
+
+Merging the dataframes
+```{r}
+county_agg$county = gsub(" County", "", county_agg$county)
+merged_sf <- merge(sf_data, county_agg, by.x= "Name", by.y= "county")
+
+```
+Now we can get insights of the dataframe since we have merged it.
+
+
+### Research Question
+Is there a significant relationship between the number of children dewormed monthly and the Child Health Indicators (prevalence of acute malnutrition, stunting, underweight, or diarrhea cases) among children under 5 years old in the country?
+
+#### Solution
+To answer this question, we need to perform a Correlation Analysis. We will compute correlation coefficients (i.e., Pearson correlation) to assess the relationships between the number of children dewormed and child health indicators like acute malnutrition, stunting, underweight, and diarrhea cases in Kenya. However, another research should be conducted to control for each county level.
+
+We need the monthly dataset for the aforementioned variables:
+```{r}
+cor_data <- time_agg %>% 
+  dplyr::select(-c(period, date))
+```
+
+Let's do the correlation analysis:
+```{r}
+library(PerformanceAnalytics)
+chart.Correlation(cor_data, method = "pearson", histogram = F, pch = 16)
+```
+
+There is a very weak insignificant relationship between the number of children dewormed monthly and all the Child Health indicators. This means that deworming has no effect on the health indicators. Some improvements should be made.
